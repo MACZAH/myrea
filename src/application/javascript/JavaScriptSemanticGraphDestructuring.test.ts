@@ -74,18 +74,36 @@ it.each([
   [
     "object",
     'const config = { mode: "strict" }; const { mode: selected } = config; config.mode = "loose";',
+    false,
   ],
   [
     "array",
     'const config = ["strict"]; const [selected] = config; config[0] = "loose";',
+    false,
   ],
   [
     "nested",
     'const config = { nested: { mode: "strict" } }; const { nested: { mode: selected } } = config; config.nested.mode = "loose";',
+    false,
   ],
-])(
+  [
+    "object assignment",
+    'const config = { mode: "strict" }; let selected; ({ mode: selected } = config); config.mode = "loose";',
+    true,
+  ],
+  [
+    "array assignment",
+    'const config = ["strict"]; let selected; [selected] = config; config[0] = "loose";',
+    true,
+  ],
+  [
+    "nested assignment",
+    'const config = { nested: { mode: "strict" } }; let selected; ({ nested: { mode: selected } } = config); config.nested.mode = "loose";',
+    true,
+  ],
+] as const)(
   "retains the captured property dependency before a later %s write",
-  (_name, source) => {
+  (_name, source, retainsUninitializedDefinition) => {
     const graph = graphForJavaScript(source);
     const selected = graph.nodes.find(
       (node) => node.kind === "binding" && node.label === "selected",
@@ -105,7 +123,16 @@ it.each([
       }),
     );
     expect(trace.relations).toContainEqual(edge);
-    expect(trace.unknowns).toEqual([]);
+    if (retainsUninitializedDefinition)
+      expect(trace.unknowns).toContainEqual(
+        expect.objectContaining({
+          family: "data-flow",
+          reason: "unknown-value",
+          node_id: selected?.node_id,
+          relation_kinds: ["defines"],
+        }),
+      );
+    else expect(trace.unknowns).toEqual([]);
   },
 );
 
@@ -163,6 +190,51 @@ it.each([
   [
     "missing nested default",
     'const config = {}; const { nested: { mode: selected } = { mode: "strict" } } = config; config.nested = {};',
+    "candidate",
+  ],
+  [
+    "later assignment deletion",
+    'const config = { mode: "strict" }; let selected; ({ mode: selected } = config); delete config.mode;',
+    "resolved",
+  ],
+  [
+    "earlier assignment deletion",
+    'const config = { mode: "strict" }; let selected; delete config.mode; ({ mode: selected } = config);',
+    "candidate",
+  ],
+  [
+    "unknown assignment source",
+    "const config = unknownSource; let selected; ({ mode: selected } = config);",
+    "candidate",
+  ],
+  [
+    "assignment default deletes source",
+    'const config = { mode: "strict" }; let absent, selected; ({ absent = delete config.mode, mode: selected } = config);',
+    "candidate",
+  ],
+  [
+    "deferred assignment read",
+    'const config = { mode: "strict" }; let selected; function read() { ({ mode: selected } = config); } delete config.mode; read();',
+    "candidate",
+  ],
+  [
+    "repeated assignment function",
+    'const config = { mode: "strict" }; let selected; function read() { ({ mode: selected } = config); delete config.mode; } read(); read();',
+    "candidate",
+  ],
+  [
+    "repeated assignment loop",
+    'const config = { mode: "strict" }; let selected; for (let i = 0; i < 2; i++) { ({ mode: selected } = config); delete config.mode; }',
+    "candidate",
+  ],
+  [
+    "custom assignment iterator",
+    'const config = ["strict"]; let selected; config[Symbol.iterator] = function* () { yield "different"; }; [selected] = config; config[0] = "loose";',
+    "candidate",
+  ],
+  [
+    "missing nested assignment default",
+    'const config = {}; let selected; ({ nested: { mode: selected } = { mode: "strict" } } = config); config.nested = {};',
     "candidate",
   ],
 ])(
