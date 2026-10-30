@@ -29,6 +29,7 @@ type FormatsWithReaders =
   | "asar"
   | "godot-pck"
   | "unityfs"
+  | "wxapkg"
   | "uimage"
   | "mach-o-universal"
   | "directory"

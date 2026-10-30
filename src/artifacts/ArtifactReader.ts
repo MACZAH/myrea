@@ -195,6 +195,7 @@ export interface ArtifactReader {
     | "asar"
     | "godot-pck"
     | "unityfs"
+    | "wxapkg"
     | "uimage"
     | "pyinstaller"
     | "dotnet-bundle"

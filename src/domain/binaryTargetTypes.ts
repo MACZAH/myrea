@@ -267,6 +267,7 @@ export type BinaryTarget =
           | "asar"
           | "godot-pck"
           | "unityfs"
+          | "wxapkg"
           | "uimage"
           | "dmg"
           | "pkg"
